@@ -1,4 +1,4 @@
-# Differentiable Floating-point Operation
+# Differentiable Floating-point Operations
 
 The DFO crate aims at making your already existing code differentiable, leveraging automatic differentiation.
 
