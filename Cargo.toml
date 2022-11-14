@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 num-traits = "0.2.15"
 forward_ref_generic = "0.2"
+
+[dev-dependencies]
+ndarray = "0.15.0"
