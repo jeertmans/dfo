@@ -38,12 +38,12 @@ pub type DFloat64 = DFloat<f64>;
 // Implementing std::ops traits
 
 macro_rules! impl_binop (
-    ($trait:ident, $method:ident, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
+    ($trait:ident, $method:ident, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block $(, $other_traits:ident)*) => (
 
 impl<'a, A, B> $trait<&'a DFloat<B>> for &'a DFloat<A>
 where
-    A: $trait<B, Output = A>,
     &'a A: $trait<&'a B, Output = A>,
+    $(&'a A: $other_traits<&'a B, Output = A>),*
 {
     type Output = DFloat<A>;
     fn $method(self, other: &'a DFloat<B>) -> Self::Output {
@@ -55,8 +55,8 @@ where
 
 impl<'a, A, B> $trait<DFloat<B>> for &'a DFloat<A>
 where
-    A: $trait<B, Output = B>,
     &'a A: $trait<B, Output = B>,
+    $(&'a A: $other_traits<B, Output = B>),*
 {
     type Output = DFloat<B>;
     fn $method(self, other: DFloat<B>) -> Self::Output {
@@ -70,6 +70,7 @@ where
 impl<'a, A, B> $trait<&'a DFloat<B>> for DFloat<A>
 where
     A: $trait<&'a B, Output = A>,
+    $(A: $other_traits<&'a B, Output = A>),*
 {
     type Output = DFloat<A>;
     fn $method(self, other: &'a DFloat<B>) -> Self::Output {
@@ -82,6 +83,7 @@ where
 impl<A, B> $trait<DFloat<B>> for DFloat<A>
 where
     A: $trait<B, Output = A>,
+    $(A: $other_traits<B, Output = A>),*
 {
     type Output = DFloat<A>;
     fn $method(self, other: DFloat<B>) -> Self::Output {
@@ -100,9 +102,34 @@ impl_binop!(Add, add, |xa: A, dxa: A, xb: B, dxb: B| {
         dx: dxa + dxb,
     }
 });
-//impl_binop!(Div, div, |xa: A, dxa: A, xb: B, dxb: B| { DFloat { x: xa / xb, dx: dxa + dxb }});
-//impl_binop!(Mul, mul, |xa: A, dxa: A, xb: B, dxb: B| { DFloat { x: xa * xb, dx: dxa + dxb }});
-//impl_binop!(Sub, sub, |xa: A, dxa: A, xb: B, dxb: B| { DFloat { x: xa - xb, dx: dxa - dxb }});
+impl_binop!(
+    Div,
+    div,
+    |xa: A, dxa: A, xb: B, dxb: B| {
+        DFloat {
+            x: xa / xb,
+            dx: dxa + dxb,
+        }
+    },
+    Add
+);
+impl_binop!(
+    Mul,
+    mul,
+    |xa: A, dxa: A, xb: B, dxb: B| {
+        DFloat {
+            x: xa * xb,
+            dx: dxa + dxb,
+        }
+    },
+    Add
+);
+impl_binop!(Sub, sub, |xa: A, dxa: A, xb: B, dxb: B| {
+    DFloat {
+        x: xa - xb,
+        dx: dxa - dxb,
+    }
+});
 
 #[cfg(test)]
 mod tests {
@@ -115,11 +142,11 @@ mod tests {
         let d1 = DFloat { x: 1.0, dx: 2.0 };
         let d2 = DFloat { x: 2.0, dx: 4.0 };
 
-        assert_eq!(d1.clone() + d2.clone(), DFloat { x: 3.0, dx: 6.0});
-        assert_eq!(d1.clone() + DF32::from(2.0), DFloat { x: 3.0, dx: 2.0});
-        assert_eq!(&d1 + &d2, DFloat { x: 3.0, dx: 6.0});
-        assert_eq!(d1.clone() + &d2, DFloat { x: 3.0, dx: 6.0});
-        assert_eq!(&d1 + d2.clone(), DFloat { x: 3.0, dx: 6.0});
+        assert_eq!(d1.clone() + d2.clone(), DFloat { x: 3.0, dx: 6.0 });
+        assert_eq!(d1.clone() + DF32::from(2.0), DFloat { x: 3.0, dx: 2.0 });
+        assert_eq!(&d1 + &d2, DFloat { x: 3.0, dx: 6.0 });
+        assert_eq!(d1.clone() + &d2, DFloat { x: 3.0, dx: 6.0 });
+        assert_eq!(&d1 + d2.clone(), DFloat { x: 3.0, dx: 6.0 });
 
         let a1 = arr1(&vec![1, 2, 3, 4]);
         let a2 = arr1(&vec![5, 6, 7, 8]);
