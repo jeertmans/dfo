@@ -40,65 +40,51 @@ pub type DFloat64 = DFloat<f64>;
 macro_rules! impl_binop (
     ($trait:ident, $method:ident, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
 
-        impl_binop!($trait, $method, DFloat<A>, DFloat<B>, |$xa: $_xa, $dxa: $_dxa, $xb: $_xb, $dxb: $_dxb| $body);
-        impl_binop!($trait, $method, DFloat<A>, &DFloat<B>, |$xa: $_xa, $dxa: $_dxa, $xb: $_xb, $dxb: $_dxb| $body);
-        impl_binop!($trait, $method, &DFloat<A>, DFloat<B>, |$xa: $_xa, $dxa: $_dxa, $xb: $_xb, $dxb: $_dxb| $body);
-        impl_binop!($trait, $method, &DFloat<A>, &DFloat<B>, |$xa: $_xa, $dxa: $_dxa, $xb: $_xb, $dxb: $_dxb| $body);
-
-);
-    ($trait:ident, $method:ident, &$lhs:ty, &$rhs:ty, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
-
-impl<'a, A, B> $trait<&'a $rhs> for &'a DFloat<A>
+impl<'a, A, B> $trait<&'a DFloat<B>> for &'a DFloat<A>
 where
     A: $trait<B, Output = A>,
     &'a A: $trait<&'a B, Output = A>,
 {
     type Output = DFloat<A>;
-    fn $method(self, other: &'a $rhs) -> Self::Output {
+    fn $method(self, other: &'a DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (&self.x, &self.dx);
         let ($xb, $dxb) = (&other.x, &other.dx);
         $body
     }
 }
-);
-    ($trait:ident, $method:ident, &$lhs:ty, $rhs:ty, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
 
-impl<'a, A, B> $trait<$rhs> for &'a DFloat<A>
+impl<'a, A, B> $trait<DFloat<B>> for &'a DFloat<A>
 where
     A: $trait<B, Output = B>,
     &'a A: $trait<B, Output = B>,
 {
     type Output = DFloat<B>;
-    fn $method(self, other: $rhs) -> Self::Output {
-        let other: $rhs = other.into();
+    fn $method(self, other: DFloat<B>) -> Self::Output {
+        let other: DFloat<B> = other.into();
         let ($xa, $dxa) = (&self.x, &self.dx);
         let ($xb, $dxb) = (other.x, other.dx);
         $body
     }
 }
-);
-    ($trait:ident, $method:ident, $lhs:ty, &$rhs:ty, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
 
-impl<'a, A, B> $trait<&'a $rhs> for DFloat<A>
+impl<'a, A, B> $trait<&'a DFloat<B>> for DFloat<A>
 where
     A: $trait<&'a B, Output = A>,
 {
     type Output = DFloat<A>;
-    fn $method(self, other: &'a $rhs) -> Self::Output {
+    fn $method(self, other: &'a DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (self.x, self.dx);
         let ($xb, $dxb) = (&other.x, &other.dx);
         $body
     }
 }
-);
-    ($trait:ident, $method:ident, $lhs:ty, $rhs:ty, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block ) => (
 
-impl<A, B> $trait<$rhs> for DFloat<A>
+impl<A, B> $trait<DFloat<B>> for DFloat<A>
 where
     A: $trait<B, Output = A>,
 {
     type Output = DFloat<A>;
-    fn $method(self, other: $rhs) -> Self::Output {
+    fn $method(self, other: DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (self.x, self.dx);
         let ($xb, $dxb) = (other.x, other.dx);
         $body
