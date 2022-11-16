@@ -1,13 +1,28 @@
 [package]
 name = "dfo"
-version = "0.1.0"
+version = "0.1.0-alpha"
+authors = ["Jérome Eertmans <jeertmans@icloud.com>"]
 edition = "2021"
+description = "Differentiable Floating-point Operations in Rust."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/jeertmans/dfo"
+keywords = ["autodiff", "forward", "differentiation"]
+include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
+rust-version = "1.57.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-num-traits = "0.2.15"
+num-traits = { version = "0.2.15", optional = true }
 forward_ref_generic = "0.2"
 
+
+[features]
+default = ["num-traits"]
+
 [dev-dependencies]
+concat-idents = "1.1.4"
 ndarray = "0.15.0"

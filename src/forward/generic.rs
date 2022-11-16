@@ -36,9 +36,9 @@ pub type DFloat32 = DFloat<f32>;
 pub type DFloat64 = DFloat<f64>;
 
 // Implementing std::ops traits
-
+//where $T:ident: $trt:ident<$U:ident, Output= $V:ident>
 macro_rules! impl_binop (
-    ($trait:ident, $method:ident, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block $(, $other_traits:ident)*) => (
+    ($trait:ident, $method:ident, |$xa:tt : $_xa:ty, $dxa:tt : $_dxa:ty, $xb:tt : $_xb:ty, $dxb:tt : $_dxb:ty| $body:block $(, $other_traits:ident)* ) => (
 
 impl<'a, A, B> $trait<&'a DFloat<B>> for &'a DFloat<A>
 where
@@ -46,6 +46,7 @@ where
     $(&'a A: $other_traits<&'a B, Output = A>),*
 {
     type Output = DFloat<A>;
+    #[inline]
     fn $method(self, other: &'a DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (&self.x, &self.dx);
         let ($xb, $dxb) = (&other.x, &other.dx);
@@ -55,10 +56,11 @@ where
 
 impl<'a, A, B> $trait<DFloat<B>> for &'a DFloat<A>
 where
-    &'a A: $trait<B, Output = B>,
-    $(&'a A: $other_traits<B, Output = B>),*
+    &'a A: $trait<B, Output = A>,
+    $(&'a A: $other_traits<B, Output = A>),*
 {
-    type Output = DFloat<B>;
+    type Output = DFloat<A>;
+    #[inline]
     fn $method(self, other: DFloat<B>) -> Self::Output {
         let other: DFloat<B> = other.into();
         let ($xa, $dxa) = (&self.x, &self.dx);
@@ -73,6 +75,7 @@ where
     $(A: $other_traits<&'a B, Output = A>),*
 {
     type Output = DFloat<A>;
+    #[inline]
     fn $method(self, other: &'a DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (self.x, self.dx);
         let ($xb, $dxb) = (&other.x, &other.dx);
@@ -83,9 +86,16 @@ where
 impl<A, B> $trait<DFloat<B>> for DFloat<A>
 where
     A: $trait<B, Output = A>,
+    A: $trait<A, Output = A>,
+    B: $trait<B, Output = A>,
+    B: $trait<A, Output = A>,
     $(A: $other_traits<B, Output = A>),*
+    $(A: $other_traits<A, Output = A>),*
+    $(B: $other_traits<B, Output = A>),*
+    $(B: $other_traits<A, Output = A>),*
 {
     type Output = DFloat<A>;
+    #[inline]
     fn $method(self, other: DFloat<B>) -> Self::Output {
         let ($xa, $dxa) = (self.x, self.dx);
         let ($xb, $dxb) = (other.x, other.dx);
@@ -119,7 +129,7 @@ impl_binop!(
     |xa: A, dxa: A, xb: B, dxb: B| {
         DFloat {
             x: xa * xb,
-            dx: dxa + dxb,
+            dx: xa * dxb + dxa * xb,
         }
     },
     Add
