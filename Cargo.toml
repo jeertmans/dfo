@@ -17,8 +17,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 num-traits = { version = "0.2.15", optional = true }
-forward_ref_generic = "0.2"
-
 
 [features]
 default = ["num-traits"]

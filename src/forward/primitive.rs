@@ -1,5 +1,6 @@
 //! Forward automatic differentiation implemented on primitive types.
 //!
+use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, Num, NumCast, One, ToPrimitive, Zero};
 use std::ops::{
@@ -17,6 +18,32 @@ pub struct DFloat<T> {
     x: T,
     dx: T,
 }
+
+macro_rules! impl_differentiable {
+    ($($t:ty)*) => ($(
+        impl Differentiable for DFloat<$t> {
+            type Inner = $t;
+            #[inline]
+            fn var(x: Self::Inner) -> Self {
+                Self { x, dx: 1 as $t }
+            }
+            #[inline]
+            fn cst(x: Self::Inner) -> Self {
+                Self { x, dx: 0 as $t }
+            }
+            #[inline]
+            fn value(&self) -> &Self::Inner {
+                &self.x
+            }
+            #[inline]
+            fn deriv(&self) -> &Self::Inner {
+                &self.dx
+            }
+        }
+    )*)
+}
+
+impl_differentiable!(f32 f64);
 
 macro_rules! impl_from {
     ($($t:ty)*) => ($(
@@ -44,6 +71,18 @@ macro_rules! impl_from {
                 Self { x: *(x.0), dx: *(x.1) }
             }
         }
+        impl From<DFloat<$t>> for ($t, $t) {
+            #[inline]
+            fn from(x: DFloat<$t>) -> ($t, $t) {
+                (x.x, x.dx)
+            }
+        }
+        impl From<&DFloat<$t>> for ($t, $t) {
+            #[inline]
+            fn from(x: &DFloat<$t>) -> ($t, $t) {
+                (*(&x.x), *(&x.dx))
+            }
+        }
     )*)
 }
 
@@ -59,10 +98,14 @@ macro_rules! test_from {
                 let d2: DFloat<$t> = (&4.0).into();
                 let d3: DFloat<$t> = (4.0, 8.0).into();
                 let d4: DFloat<$t> = (&4.0, &8.0).into();
+                let t1: ($t, $t) = d3.clone().into();
+                let t2: ($t, $t) = (&d3).into();
                 assert_eq!(d1, DFloat { x: 4.0, dx: 0.0 });
                 assert_eq!(d2, DFloat { x: 4.0, dx: 0.0 });
                 assert_eq!(d3, DFloat { x: 4.0, dx: 8.0 });
                 assert_eq!(d4, DFloat { x: 4.0, dx: 8.0 });
+                assert_eq!(t1, (4.0, 8.0));
+                assert_eq!(t2, (4.0, 8.0));
             }
         });
     )*)
@@ -293,7 +336,7 @@ macro_rules! impl_all_binops {
         impl_binop!(Div, div, $t,
                     DivAssign, div_assign,
                     |a, da, b, db| {
-                        DFloat { x: a / b, dx: (a * db - da * b) / (b * b) }
+                        DFloat { x: a / b, dx: (da * b - a * db) / (b * b) }
                     });
         impl_binop!(Mul, mul, $t,
                     MulAssign, mul_assign,
@@ -361,9 +404,6 @@ mod binop_tests {
     test_all_binops!(f32 f64);
 }
 
-//impl NumOps for DFloat<f32> {}
-//impl NumOps for DFloat<f64> {}
-
 #[cfg(feature = "num-traits")]
 macro_rules! impl_num {
     ($($t:ty)*) => ($(
@@ -416,47 +456,47 @@ macro_rules! impl_float {
         impl Float for DFloat<$t> {
             #[inline]
             fn nan() -> Self {
-                Self { x: <$t>::nan(), dx: <$t>::nan() }
+                Self::cst(<$t>::nan())
             }
             #[inline]
             fn infinity() -> Self {
-                Self { x: <$t>::infinity(), dx: <$t>::infinity() }
+                Self::cst(<$t>::infinity())
             }
             #[inline]
             fn neg_infinity() -> Self {
-                Self { x: <$t>::neg_infinity(), dx: <$t>::neg_infinity() }
+                Self::cst(<$t>::neg_infinity())
             }
             #[inline]
             fn neg_zero() -> Self {
-                Self { x: <$t>::neg_zero(), dx: <$t>::neg_zero() }
+                Self::cst(<$t>::neg_zero())
             }
             #[inline]
             fn min_value() -> Self {
-                Self { x: <$t>::min_value(), dx: <$t>::min_value() }
+                Self::cst(<$t>::min_value())
             }
             #[inline]
             fn min_positive_value() -> Self {
-                Self { x: <$t>::min_positive_value(), dx: <$t>::min_positive_value() }
+                Self::cst(<$t>::min_positive_value())
             }
             #[inline]
             fn max_value() -> Self {
-                Self { x: <$t>::max_value(), dx: <$t>::max_value() }
+                Self::cst(<$t>::max_value())
             }
             #[inline]
             fn is_nan(self) -> bool {
-                self.x.is_nan() || self.dx.is_nan()
+                self.x.is_nan()
             }
             #[inline]
             fn is_infinite(self) -> bool {
-                self.x.is_infinite() || self.dx.is_infinite()
+                self.x.is_infinite()
             }
             #[inline]
             fn is_finite(self) -> bool {
-                self.x.is_finite() && self.dx.is_finite()
+                self.x.is_finite()
             }
             #[inline]
             fn is_normal(self) -> bool {
-                self.x.is_normal() || self.dx.is_normal()
+                self.x.is_normal()
             }
             #[inline]
             fn classify(self) -> std::num::FpCategory {
@@ -464,31 +504,35 @@ macro_rules! impl_float {
             }
             #[inline]
             fn floor(self) -> Self {
-                todo!()
+                Self::cst(self.x.floor())
             }
             #[inline]
             fn ceil(self) -> Self {
-                todo!()
+                Self::cst(self.x.ceil())
             }
             #[inline]
             fn round(self) -> Self {
-                todo!()
+                Self::cst(self.x.round())
             }
             #[inline]
             fn trunc(self) -> Self {
-                todo!()
+                Self::cst(self.x.trunc())
             }
             #[inline]
             fn fract(self) -> Self {
-                Self { x: self.x.fract(), dx: self.dx.fract() }
+                Self::cst(self.x.fract())
             }
             #[inline]
             fn abs(self) -> Self {
-                Self { x: self.x.abs(), dx: self.dx.abs() }
+                if self.x.is_sign_positive() {
+                    self
+                } else {
+                    -self
+                }
             }
             #[inline]
             fn signum(self) -> Self {
-                Self { x: self.x.signum(), dx: self.dx.signum() }
+                Self::cst(self.x.signum())
             }
             #[inline]
             fn is_sign_positive(self) -> bool {
@@ -500,30 +544,42 @@ macro_rules! impl_float {
             }
             #[inline]
             fn mul_add(self, a: Self, b: Self) ->Self {
-                (self * a) + b
+                let x = self.x.mul_add(a.x, b.x);
+                let dx = self.x.mul_add(a.dx, b.dx) + self.dx * a.x;
+                Self { x, dx }
             }
             #[inline]
             fn recip(self) -> Self {
-                Self::one() / self
+                let x = self.x.recip();
+                let dx = self.dx * x * x;
+                Self { x, dx }
             }
             #[inline]
             fn powi(self, n: i32) -> Self {
-                todo!()
+                let x = self.x.powi(n);
+                let dx = (n as $t) * x * self.x.recip() * self.dx;
+                Self { x, dx }
             }
             #[inline]
             fn powf(self, n: Self) -> Self {
-                todo!()
-            }
-            #[inline]
-            fn exp(self) -> Self {
-                todo!()
-            }
-            #[inline]
-            fn exp2(self) -> Self {
-                todo!()
+                let x = self.x.powf(n.x);
+                let dx = x * n.dx.mul_add(self.x.ln(), self.dx * self.x.recip() * n.x);
+                Self { x, dx }
             }
             #[inline]
             fn sqrt(self) -> Self {
+                let x = self.x.sqrt();
+                let dx = - self.dx * x.recip();
+                Self { x, dx }
+            }
+            #[inline]
+            fn exp(self) -> Self {
+                let x = self.x.exp();
+                let dx = self.dx * x;
+                Self { x, dx }
+            }
+            #[inline]
+            fn exp2(self) -> Self {
                 todo!()
             }
             #[inline]
@@ -636,6 +692,123 @@ macro_rules! impl_float {
 
 #[cfg(feature = "num-traits")]
 impl_float!(f32 f64);
+
+#[cfg(test)]
+macro_rules! test_value_and_deriv {
+    ($mth:ident, $t:ty, $var:literal $(, $vars:literal)*, |$x_var:tt $(, $o_vars:tt : $t_vars:ty)*| $body:block) => (
+        concat_idents::concat_idents!(test_name = test_method_, $mth, _, $t, _has_expected_value_and_derivative {
+            #[test]
+            #[allow(unused_variables)]
+            #[allow(unused_parens)]
+            fn test_name() {
+                let v = DFloat::<$t>::var($var);
+                let got: DFloat<$t> = DFloat::<$t>::$mth(
+                    v $(, std::convert::Into::<$t_vars>::into($vars))*
+                );
+                let expected = {
+                    let ($x_var $(, $o_vars)*) = ($var $(, $vars)*);
+                    $body
+                };
+                assert_eq!(*got.value(), <$t>::$mth($var $(, $vars)*));
+                assert_eq!(*got.deriv(), expected);
+            }
+        });
+    )
+}
+
+#[cfg(test)]
+macro_rules! test_all_ops {
+    ($($t:ty)*) => ($(
+        test_value_and_deriv!(add, $t, 4.0, 8.0,
+                              |x, y: $t| {
+                                  1 as $t
+                              });
+        test_value_and_deriv!(div, $t, 4.0, 8.0,
+                              |x, y: $t| {
+                                  (1.0 / y) as $t
+                              });
+        test_value_and_deriv!(mul, $t, 4.0, 8.0,
+                              |x, y: $t| {
+                                  y as $t
+                              });
+        test_value_and_deriv!(sub, $t, 4.0, 8.0,
+                              |x, y: $t| {
+                                  1 as $t
+                              });
+    )*)
+}
+
+#[cfg(feature = "num-traits")]
+#[cfg(test)]
+macro_rules! test_all_float {
+    ($($t:ty)*) => ($(
+        test_value_and_deriv!(floor, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(ceil, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(round, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(trunc, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(fract, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(abs, $t, -4.0,
+                              |x| {
+                                  x.signum() as $t
+                              });
+        test_value_and_deriv!(signum, $t, 4.0,
+                              |x| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(mul_add, $t, 4.0, 8.0, 7.0,
+                              |x, y: DFloat<$t>, z: DFloat<$t>| {
+                                  y as $t
+                              });
+        test_value_and_deriv!(recip, $t, 2.0,
+                              |x| {
+                                  (1.0 / (x * x)) as $t
+                              });
+        test_value_and_deriv!(powi, $t, 4.0, 3,
+                              |x, n: i32| {
+                                  (n as $t) * x.powi(n - 1)
+                              });
+        test_value_and_deriv!(powf, $t, 4.0, 3.0,
+                              |x, n: DFloat<$t>| {
+                                  x.powf(n) * n / x
+                              });
+        test_value_and_deriv!(sqrt, $t, 4.0,
+                              |x| {
+                                  - x.sqrt().recip()
+                              });
+        test_value_and_deriv!(exp, $t, 4.0,
+                              |x| {
+                                  x.exp()
+                              });
+    )*)
+}
+
+#[cfg(test)]
+mod ops_tests {
+    use super::*;
+    test_all_ops!(f32 f64);
+}
+
+#[cfg(feature = "num-traits")]
+#[cfg(test)]
+mod test_float {
+    use super::*;
+    test_all_float!(f32 f64);
+}
 
 /// Automatically differentiated float using [`f32`] as base type.
 pub type DFloat32 = DFloat<f32>;

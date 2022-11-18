@@ -13,10 +13,10 @@ TODOs:
 - [ ] Implement other traits, until `Float` is implemented
 - [ ] Reorganize and clean crate
 - [ ] Create some GitHub actions
-- [ ] Publish crate on https://crates.io
+- [x] Publish crate on `https://crates.io>`
 - [ ] Create examples for multiple inputs, multiple outputs, ndarrays, and more
 - [ ] Go for backward autodiff
 
 Similar crates:
 
-- https://github.com/elrnv/autodiff
+- `<https://github.com/elrnv/autodiff>`
