@@ -2,7 +2,7 @@
 //!
 use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
-use num_traits::{Float, Num, NumCast, One, ToPrimitive, Zero};
+use num_traits::{Float, FloatConst, Num, NumCast, One, ToPrimitive, Zero};
 use std::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
 };
@@ -424,10 +424,10 @@ macro_rules! impl_to_primitive {
     ($($t:ty)*) => ($(
         impl ToPrimitive for DFloat<$t> {
             fn to_i64(&self) -> Option<i64> {
-                None
+                self.x.to_i64()
             }
             fn to_u64(&self) -> Option<u64> {
-                None
+                self.x.to_u64()
             }
         }
     )*)
@@ -441,7 +441,7 @@ macro_rules! impl_num_cast {
     ($($t:ty)*) => ($(
         impl NumCast for DFloat<$t> {
             fn from<T: ToPrimitive>(n: T) -> Option<Self> {
-                None
+                NumCast::from(n).map(|x| Self::cst(x))
             }
         }
     )*)
@@ -526,8 +526,10 @@ macro_rules! impl_float {
             fn abs(self) -> Self {
                 if self.x.is_sign_positive() {
                     self
-                } else {
+                } else if self.x.is_sign_negative() {
                     -self
+                } else {
+                    Self { x: self.x, dx: <$t>::nan() }
                 }
             }
             #[inline]
@@ -580,107 +582,162 @@ macro_rules! impl_float {
             }
             #[inline]
             fn exp2(self) -> Self {
-                todo!()
+                let x = self.x.exp2();
+                let dx = self.dx * x * <$t>::LN_2();
+                Self { x, dx }
             }
             #[inline]
             fn ln(self) -> Self {
-                todo!()
+                let x = self.x.ln();
+                let dx = self.dx * self.x.recip();
+                Self { x, dx }
             }
             #[inline]
             fn log(self, base: Self) -> Self {
-                todo!()
+                self.ln() / base.ln()
             }
             #[inline]
             fn log2(self) -> Self {
-                todo!()
+                let x = self.x.log2();
+                let dx = self.dx * (<$t>::LN_2() * self.x).recip();
+                Self { x, dx }
             }
             #[inline]
             fn log10(self) -> Self {
-                todo!()
+                let x = self.x.log2();
+                let dx = self.dx * (<$t>::LN_10() * self.x).recip();
+                Self { x, dx }
             }
             #[inline]
             fn max(self, other: Self) -> Self {
-                todo!()
+                if self.x >= other.x {
+                    self
+                } else {
+                    other
+                }
             }
             #[inline]
             fn min(self, other: Self) -> Self {
-                todo!()
+                if self.x <= other.x {
+                    self
+                } else {
+                    other
+                }
             }
             #[inline]
             fn abs_sub(self, other: Self) -> Self {
-                todo!()
+                (self - other).abs()
             }
             #[inline]
             fn cbrt(self) -> Self {
-                todo!()
+                let x = self.x.cbrt();
+                let dx = - self.dx * (x * x * (3 as $t)).recip();
+                Self { x, dx }
             }
             #[inline]
             fn hypot(self, other: Self) -> Self {
-                todo!()
+                let x = self.x.hypot(other.x);
+                let dx = self.x.mul_add(other.dx, self.dx * other.x) * x.recip();
+                Self { x, dx }
             }
             #[inline]
             fn sin(self) -> Self {
-                todo!()
+                let (x, cos) = self.x.sin_cos();
+                let dx = self.dx * cos;
+                Self { x, dx }
             }
             #[inline]
             fn cos(self) -> Self {
-                todo!()
+                let (sin, x) = self.x.sin_cos();
+                let dx = - self.dx * sin;
+                Self { x, dx }
             }
             #[inline]
             fn tan(self) -> Self {
-                todo!()
+                let (sin, cos) = self.x.sin_cos();
+                let _cos = cos.recip();
+                let dx = self.dx * _cos * _cos;
+                Self { x: sin * _cos, dx }
             }
             #[inline]
             fn asin(self) -> Self {
-                todo!()
+                let x = self.x.asin();
+                let dx = self.dx * ((1 as $t) - self.x * self.x).sqrt().recip();
+                Self { x, dx }
             }
             #[inline]
             fn acos(self) -> Self {
-                todo!()
+                let x = self.x.acos();
+                let dx = - self.dx * ((1 as $t) - self.x * self.x).sqrt().recip();
+                Self { x, dx }
             }
             #[inline]
             fn atan(self) -> Self {
-                todo!()
+                let x = self.x.atan();
+                let dx = self.dx * ((1 as $t) + self.x * self.x).recip();
+                Self { x, dx }
             }
             #[inline]
             fn atan2(self, other: Self) -> Self {
-                todo!()
+                let x = self.x.atan2(other.x);
+                let num = self.x.mul_add(other.dx, - self.dx * other.x);
+                let den = self.x.mul_add(self.x, other.x * other.x);
+                let dx = num * den.recip();
+                Self { x, dx }
             }
             #[inline]
             fn sin_cos(self) -> (Self, Self) {
-                todo!()
+                let (sin, cos) = self.x.sin_cos();
+                (Self { x: sin, dx: self.dx * cos }, Self { x: cos, dx: -self.dx * sin })
             }
             #[inline]
             fn exp_m1(self) -> Self {
-                todo!()
+                let x = self.x.exp_m1();
+                let dx = self.dx * x;
+                Self { x, dx }
             }
             #[inline]
             fn ln_1p(self) -> Self {
-                todo!()
+                let x = self.x.ln_1p();
+                let dx = self.dx * self.x.recip();
+                Self { x, dx }
             }
             #[inline]
             fn sinh(self) -> Self {
-                todo!()
+                let x = self.x.sinh();
+                let dx = self.dx * self.x.cosh();
+                Self { x, dx }
             }
             #[inline]
             fn cosh(self) -> Self {
-                todo!()
+                let x = self.x.cosh();
+                let dx = self.dx * self.x.sinh();
+                Self { x, dx }
             }
             #[inline]
             fn tanh(self) -> Self {
-                todo!()
+                let x = self.x.tanh();
+                let cosh = self.x.cosh();
+                let dx = self.dx * (cosh * cosh).recip();
+                Self { x, dx }
             }
             #[inline]
             fn asinh(self) -> Self {
-                todo!()
+                let x = self.x.asinh();
+                let dx = self.dx * (self.x * self.x + (1 as $t)).sqrt().recip();
+                Self { x, dx }
             }
             #[inline]
             fn acosh(self) -> Self {
-                todo!()
+                let x = self.x.acosh();
+                let dx = self.dx * ((self.x - (1 as $t)).sqrt() * (self.x + (1 as $t)).sqrt()).recip();
+                Self { x, dx }
             }
             #[inline]
             fn atanh(self) -> Self {
-                todo!()
+                let x = self.x.atanh();
+                let dx = self.dx * ((1 as $t) - self.x * self.x).recip();
+                Self { x, dx }
             }
             #[inline]
             fn integer_decode(self) -> (u64, i16, i8) {
