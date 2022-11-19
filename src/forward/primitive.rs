@@ -571,7 +571,7 @@ macro_rules! impl_float {
             #[inline]
             fn sqrt(self) -> Self {
                 let x = self.x.sqrt();
-                let dx = - self.dx * x.recip();
+                let dx = - (0.5 as $t) * self.dx * x.recip();
                 Self { x, dx }
             }
             #[inline]
@@ -604,7 +604,7 @@ macro_rules! impl_float {
             }
             #[inline]
             fn log10(self) -> Self {
-                let x = self.x.log2();
+                let x = self.x.log10();
                 let dx = self.dx * (<$t>::LN_10() * self.x).recip();
                 Self { x, dx }
             }
@@ -845,11 +845,47 @@ macro_rules! test_all_float {
                               });
         test_value_and_deriv!(sqrt, $t, 4.0,
                               |x| {
-                                  - x.sqrt().recip()
+                                  - 0.5 * x.sqrt().recip()
                               });
         test_value_and_deriv!(exp, $t, 4.0,
                               |x| {
                                   x.exp()
+                              });
+        test_value_and_deriv!(exp2, $t, 4.0,
+                              |x| {
+                                  x.exp2() * <$t>::LN_2()
+                              });
+        test_value_and_deriv!(ln, $t, 4.0,
+                              |x| {
+                                  x.recip()
+                              });
+        test_value_and_deriv!(log, $t, 4.0, 17.0,
+                              |x, y: DFloat<$t>| {
+                                  (x * y.ln()).recip()
+                              });
+        test_value_and_deriv!(log2, $t, 4.0,
+                              |x| {
+                                  (x * <$t>::LN_2()).recip()
+                              });
+        test_value_and_deriv!(log10, $t, 4.0,
+                              |x| {
+                                  (x * <$t>::LN_10()).recip()
+                              });
+        test_value_and_deriv!(max, $t, 4.0, 2.0,
+                              |x, y: DFloat<$t>| {
+                                  1 as $t
+                              });
+        test_value_and_deriv!(min, $t, 4.0, 2.0,
+                              |x, y: DFloat<$t>| {
+                                  0 as $t
+                              });
+        test_value_and_deriv!(abs_sub, $t, 4.0, 2.0,
+                              |x, y: DFloat<$t>| {
+                                  1 as $t
+                              });
+        test_value_and_deriv!(cbrt, $t, 4.0,
+                              |x| {
+                                  - (3.0 * x.cbrt().powi(2)).recip()
                               });
     )*)
 }
