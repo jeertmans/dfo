@@ -637,7 +637,7 @@ macro_rules! impl_float {
             #[inline]
             fn hypot(self, other: Self) -> Self {
                 let x = self.x.hypot(other.x);
-                let dx = self.x.mul_add(other.dx, self.dx * other.x) * x.recip();
+                let dx = self.x.mul_add(self.dx, other.x * other.dx) * x.recip();
                 Self { x, dx }
             }
             #[inline]
@@ -680,7 +680,7 @@ macro_rules! impl_float {
             #[inline]
             fn atan2(self, other: Self) -> Self {
                 let x = self.x.atan2(other.x);
-                let num = self.x.mul_add(other.dx, - self.dx * other.x);
+                let num = other.x.mul_add(self.dx, - other.dx * self.x);
                 let den = self.x.mul_add(self.x, other.x * other.x);
                 let dx = num * den.recip();
                 Self { x, dx }
@@ -699,7 +699,7 @@ macro_rules! impl_float {
             #[inline]
             fn ln_1p(self) -> Self {
                 let x = self.x.ln_1p();
-                let dx = self.dx * self.x.recip();
+                let dx = self.dx * ((1 as $t) + self.x).recip();
                 Self { x, dx }
             }
             #[inline]
@@ -752,11 +752,12 @@ impl_float!(f32 f64);
 
 #[cfg(test)]
 macro_rules! test_value_and_deriv {
-    ($mth:ident, $t:ty, $var:literal $(, $vars:literal)*, |$x_var:tt $(, $o_vars:tt : $t_vars:ty)*| $body:block) => (
+    ($mth:ident, $t:ty, $var:literal $(, $vars:literal)*, |$x_var:tt $(, $o_vars:tt : $t_vars:ty)*| $body:block $(#[$attr:meta])*) => (
         concat_idents::concat_idents!(test_name = test_method_, $mth, _, $t, _has_expected_value_and_derivative {
             #[test]
             #[allow(unused_variables)]
             #[allow(unused_parens)]
+            $(#[$attr])*
             fn test_name() {
                 let v = DFloat::<$t>::var($var);
                 let got: DFloat<$t> = DFloat::<$t>::$mth(
@@ -882,10 +883,76 @@ macro_rules! test_all_float {
         test_value_and_deriv!(abs_sub, $t, 4.0, 2.0,
                               |x, y: DFloat<$t>| {
                                   1 as $t
-                              });
+                              }
+                              #[allow(deprecated)]);
         test_value_and_deriv!(cbrt, $t, 4.0,
                               |x| {
                                   - (3.0 * x.cbrt().powi(2)).recip()
+                              });
+        test_value_and_deriv!(hypot, $t, 4.0, 8.0,
+                              |x, y: DFloat<$t>| {
+                                  x * x.hypot(y).recip()
+                              });
+        test_value_and_deriv!(sin, $t, 4.0,
+                              |x| {
+                                  x.cos()
+                              });
+        test_value_and_deriv!(cos, $t, 4.0,
+                              |x| {
+                                  -x.sin()
+                              });
+        test_value_and_deriv!(tan, $t, 4.0,
+                              |x| {
+                                  x.cos().powi(2).recip()
+                              });
+        test_value_and_deriv!(asin, $t, 0.5,
+                              |x| {
+                                  ((1 as $t) - x * x).sqrt().recip()
+                              });
+        test_value_and_deriv!(acos, $t, 0.5,
+                              |x| {
+                                  -((1 as $t) - x * x).sqrt().recip()
+                              });
+        test_value_and_deriv!(atan, $t, 4.0,
+                              |x| {
+                                  ((1 as $t) + x * x).recip()
+                              });
+        test_value_and_deriv!(atan2, $t, 4.0, 8.0,
+                              |x, y: DFloat<$t>| {
+                                  y * (x * x + y * y).recip()
+                              });
+        // sin_cos is untested since the macro does not handle returning tuples
+        test_value_and_deriv!(exp_m1, $t, 4.0,
+                              |x| {
+                                  x.exp_m1()
+                              });
+        test_value_and_deriv!(ln_1p, $t, 4.0,
+                              |x| {
+                                  ((1 as $t) + x).recip()
+                              });
+        test_value_and_deriv!(sinh, $t, 4.0,
+                              |x| {
+                                  x.cosh()
+                              });
+        test_value_and_deriv!(cosh, $t, 4.0,
+                              |x| {
+                                  x.sinh()
+                              });
+        test_value_and_deriv!(tanh, $t, 4.0,
+                              |x| {
+                                  x.cosh().powi(2).recip()
+                              });
+        test_value_and_deriv!(asinh, $t, 4.0,
+                              |x| {
+                                  ((1 as $t) + x.powi(2)).sqrt().recip()
+                              });
+        test_value_and_deriv!(acosh, $t, 4.0,
+                              |x| {
+                                  ((x - (1 as $t)).sqrt() * (x + (1 as $t)).sqrt()).recip()
+                              });
+        test_value_and_deriv!(atanh, $t, 0.5,
+                              |x| {
+                                  ((1 as $t) - x.powi(2)).recip()
                               });
     )*)
 }
