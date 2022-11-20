@@ -270,6 +270,24 @@ macro_rules! impl_binop {
                 $body
             }
         }
+        impl $trt<DFloat<$t>> for $t {
+            type Output = DFloat<$t>;
+            #[inline]
+            fn $mth(self, other: DFloat<$t>) -> Self::Output {
+                let ($a, $b) = (self, 0 as $t);
+                let ($c, $d) = (other.x, other.dx);
+                $body
+            }
+        }
+        impl $trt<&DFloat<$t>> for $t {
+            type Output = DFloat<$t>;
+            #[inline]
+            fn $mth(self, other: &DFloat<$t>) -> Self::Output {
+                let ($a, $b) = (self, 0 as $t);
+                let ($c, $d) = (other.x, other.dx);
+                $body
+            }
+        }
         impl $trt<&DFloat<$t>> for DFloat<$t> {
             type Output = Self;
             #[inline]
@@ -559,13 +577,13 @@ macro_rules! impl_float {
             #[inline]
             fn powi(self, n: i32) -> Self {
                 let x = self.x.powi(n);
-                let dx = (n as $t) * x * self.x.recip() * self.dx;
+                let dx = (n as $t) * self.x.powi(n - 1) * self.dx;
                 Self { x, dx }
             }
             #[inline]
             fn powf(self, n: Self) -> Self {
                 let x = self.x.powf(n.x);
-                let dx = x * n.dx.mul_add(self.x.ln(), self.dx * self.x.recip() * n.x);
+                let dx = self.x.powf(n.x - (1 as $t)) * n.x.mul_add(self.dx, self.x * self.x.ln() * n.dx);
                 Self { x, dx }
             }
             #[inline]
@@ -968,6 +986,66 @@ mod ops_tests {
 mod test_float {
     use super::*;
     test_all_float!(f32 f64);
+}
+
+#[cfg(feature = "num-traits")]
+#[cfg(test)]
+macro_rules! test_function {
+    ($name:ident, $t:ty $(, $vars:literal)*, |$f_var:tt| $body_f:block, |$df_var:tt| $body_df:block) => (
+        concat_idents::concat_idents!(test_name = test_function_, $name, _, $t, _has_expected_derivative {
+            #[test]
+            #[allow(unused_variables)]
+            #[allow(unused_parens)]
+            fn test_name() {
+                $(
+                    let v = DFloat::<$t>::var($vars);
+                    let got = *{
+                        let $f_var = v;
+                        $body_f
+                    }.deriv();
+                    let expected = {
+                        let $df_var = $vars;
+                        $body_df
+                    };
+                    assert!((got - expected).abs() <= (1e-5 as $t), "Got: {:?} is not close enought to expected: {:?}, for input variable x = {:?}", got, expected, $vars);
+                )*
+            }
+        });
+    )
+}
+
+#[cfg(feature = "num-traits")]
+#[cfg(test)]
+macro_rules! test_all_functions {
+    ($($t:ty)*) => ($(
+            test_function!(poly2, $t, -10., 0., 5.,
+                          |x| { (3 as $t) * x.powi(2) + x },
+                          |x| { (6 as $t) * x + (1 as $t) }
+                          );
+            test_function!(polyx, $t, 2., 0.1, 5.,
+                          |x| { x.powf((2 as $t) * x) },
+                          |x| { (2 as $t) * x.powf((2 as $t) * x) * (x.ln() + (1 as $t)) }
+                          );
+            test_function!(recip1, $t, -10., 0., 5.,
+                          |x| { x.exp().ln() },
+                          |x| { 1 as $t }
+                          );
+            test_function!(recip2, $t, 0.5, 0.1, 1.5,
+                          |x| { x.cos().acos() },
+                          |x| { 1 as $t }
+                          );
+            test_function!(recip3, $t, -0.1, 0., 0.1,
+                          |x| { x.sin().asin().exp().ln() },
+                          |x| { 1 as $t }
+                          );
+    )*)
+}
+
+#[cfg(feature = "num-traits")]
+#[cfg(test)]
+mod test_functions {
+    use super::*;
+    test_all_functions!(f32 f64);
 }
 
 /// Automatically differentiated float using [`f32`] as base type.
