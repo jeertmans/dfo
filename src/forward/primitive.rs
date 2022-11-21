@@ -44,11 +44,25 @@
 //!     assert_eq!(f(x).deriv(), df(x).value());
 //! }
 //! ```
+//! 
+//! If you want to work with arrays, e.g., with `ndarray`, you can do so!
+//!
+//! ```
+//! use dfo::forward::primitive::*;
+//! use ndarray::{azip, Array1};
+//!
+//! let x: Array1<DFloat32> = 
+//!     Array1::from_iter([1., 2., 3., 4.].iter().map(|x| DFloat32::var(*x)));
+//!
+//! let y = &x * &x * 3.0;
+//!
+//! azip!((&a in &y, &b in &x) assert_eq!(*a.deriv(), 6.0 * b.value()));
+//! ```
 pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, FloatConst, Num, NumCast, One, ToPrimitive, Zero};
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
 };
