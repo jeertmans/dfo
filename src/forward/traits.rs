@@ -1,6 +1,6 @@
 /// Trait for any number-like structure that implements
 /// automatic foward differentiation.
-/// 
+///
 /// A variable should start with unit derivative, and
 /// a constant should have a zero derivative.
 ///

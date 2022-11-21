@@ -4,5 +4,5 @@
 #![allow(clippy::doc_markdown, clippy::module_name_repetitions)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
-pub mod forward;
 pub mod backward;
+pub mod forward;

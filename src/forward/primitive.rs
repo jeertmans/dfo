@@ -52,7 +52,7 @@ use std::ops::{
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature="serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 /// Automatically differentiated float.
 ///
 /// This structure only implements interesting methods for
@@ -820,7 +820,6 @@ macro_rules! impl_float {
 
 #[cfg(feature = "num-traits")]
 impl_float!(f32 f64);
-
 
 #[cfg(feature = "num-traits")]
 macro_rules! forward_const_impl {
