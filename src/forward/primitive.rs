@@ -683,18 +683,22 @@ macro_rules! impl_float {
             }
             #[inline]
             fn max(self, other: Self) -> Self {
-                if self.x >= other.x {
+                if self.x > other.x {
                     self
-                } else {
+                } else if self.x < other.x {
                     other
+                } else {
+                    Self { x: self.x, dx: <$t>::nan() }
                 }
             }
             #[inline]
             fn min(self, other: Self) -> Self {
-                if self.x <= other.x {
+                if self.x < other.x {
                     self
-                } else {
+                } else if self.x > other.x {
                     other
+                } else {
+                    Self { x: self.x, dx: <$t>::nan() }
                 }
             }
             #[inline]
