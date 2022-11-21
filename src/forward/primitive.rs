@@ -47,12 +47,14 @@
 pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, FloatConst, Num, NumCast, One, ToPrimitive, Zero};
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
 use std::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 /// Automatically differentiated float.
 ///
 /// This structure only implements interesting methods for
