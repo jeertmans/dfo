@@ -1,6 +1,50 @@
 //! Forward automatic differentiation implemented on primitive types.
 //!
-use super::traits::Differentiable;
+//! [`DFloat32`] and [`DFloat64`] both implement, for their respective primitive type,
+//! [`f32`] and [`f64`], automatic differentation on each numerical operation they
+//! perform. E.g., addition, multiplication, division, and so one.
+//!
+//! # Note
+//!
+//! Using [`DFloat`] is useless, as does not implement anything
+//! interesting but for types [`f32`] and [`f64`], which are aliased to [`DFloat32`]
+//! and [`DFloat64`]. For other types, use generic module.
+//! # Examples
+//!
+//! Using closures, computing value and derivatives become straightforward.
+//!
+//! ```
+//! # use dfo::forward::primitive::*;
+//! let f = |x| { x * x + 1.0 - x };
+//! let df = |x| { 2.0 * x - 1.0 };
+//! let x = DFloat32::var(4.0);
+//!
+//! assert_eq!(f(x).deriv(), df(x).value());
+//! ```
+//!
+//! It is also possible to use generatic types to re-use already existing code.
+//!
+//! ```
+//! # use dfo::forward::primitive::*;
+//! use num_traits::Float;
+//!
+//! fn f<T: Float + From<f32>>(x: T) -> T {
+//!     let one: T = 1.0.into();
+//!     x * x + one - x
+//! }
+//!
+//! fn df<T: Float + From<f32>>(x: T) -> T {
+//!     let (one, two): (T, T) = (1.0.into(), 2.0.into());
+//!     two * x - one
+//! }
+//!
+//! fn main() {
+//!     let x = DFloat32::var(4.0);
+//!
+//!     assert_eq!(f(x).deriv(), df(x).value());
+//! }
+//! ```
+pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, FloatConst, Num, NumCast, One, ToPrimitive, Zero};
 use std::ops::{
@@ -8,6 +52,7 @@ use std::ops::{
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature="serde", derive(serde::Deserialize, serde::Serialize))]
 /// Automatically differentiated float.
 ///
 /// This structure only implements interesting methods for
@@ -38,6 +83,14 @@ macro_rules! impl_differentiable {
             #[inline]
             fn deriv(&self) -> &Self::Inner {
                 &self.dx
+            }
+            #[inline]
+            fn from_tuple(x: Self::Inner, dx: Self::Inner) -> Self {
+                Self { x, dx }
+            }
+            #[inline]
+            fn into_tuple(self) -> (Self::Inner, Self::Inner) {
+                (self.x, self.dx )
             }
         }
     )*)
@@ -767,6 +820,47 @@ macro_rules! impl_float {
 
 #[cfg(feature = "num-traits")]
 impl_float!(f32 f64);
+
+
+#[cfg(feature = "num-traits")]
+macro_rules! forward_const_impl {
+    ($t:ty, $($mth:ident ,)*) => ($(
+        #[inline]
+        fn $mth() -> Self {
+            Self::cst(<$t>::$mth())
+        }
+    )*);
+}
+
+#[cfg(feature = "num-traits")]
+macro_rules! impl_float_const {
+    ($($t:ty)*) => ($(
+        impl FloatConst for DFloat<$t> {
+            forward_const_impl!(
+                $t,
+                E,
+                FRAC_1_PI,
+                FRAC_1_SQRT_2,
+                FRAC_2_PI,
+                FRAC_2_SQRT_PI,
+                FRAC_PI_2,
+                FRAC_PI_3,
+                FRAC_PI_4,
+                FRAC_PI_6,
+                FRAC_PI_8,
+                LN_10,
+                LN_2,
+                LOG10_E,
+                LOG2_E,
+                PI,
+                SQRT_2,
+            );
+        }
+    )*);
+}
+
+#[cfg(feature = "num-traits")]
+impl_float_const!(f32 f64);
 
 #[cfg(test)]
 macro_rules! test_value_and_deriv {
