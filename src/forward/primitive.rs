@@ -326,16 +326,30 @@ macro_rules! impl_binop {
      $t:ty,
      $($asgn_trt:ident, $asgn_mth:ident,)?
      |$a:tt, $b:tt, $c:tt, $d:tt| $body:block) => {
-        impl<T> $trt<T> for DFloat<$t>
-        where
-            T: Into<Self>,
-        {
+        impl $trt<$t> for DFloat<$t> {
             type Output = Self;
             #[inline]
-            fn $mth(self, other: T) -> Self::Output {
-                let other: Self = other.into();
+            fn $mth(self, other: $t) -> Self::Output {
                 let ($a, $b) = (self.x, self.dx);
-                let ($c, $d) = (other.x, other.dx);
+                let ($c, $d) = (other, 0 as $t);
+                $body
+            }
+        }
+        impl $trt<&$t> for DFloat<$t> {
+            type Output = Self;
+            #[inline]
+            fn $mth(self, other: &$t) -> Self::Output {
+                let ($a, $b) = (self.x, self.dx);
+                let ($c, $d) = (*other, 0 as $t);
+                $body
+            }
+        }
+        impl $trt<&$t> for &DFloat<$t> {
+            type Output = DFloat<$t>;
+            #[inline]
+            fn $mth(self, other: &$t) -> Self::Output {
+                let ($a, $b) = (self.x, self.dx);
+                let ($c, $d) = (*other, 0 as $t);
                 $body
             }
         }
@@ -357,6 +371,24 @@ macro_rules! impl_binop {
                 $body
             }
         }
+        impl $trt<&DFloat<$t>> for &$t {
+            type Output = DFloat<$t>;
+            #[inline]
+            fn $mth(self, other: &DFloat<$t>) -> Self::Output {
+                let ($a, $b) = (*self, 0 as $t);
+                let ($c, $d) = (other.x, other.dx);
+                $body
+            }
+        }
+        impl $trt<DFloat<$t>> for DFloat<$t> {
+            type Output = Self;
+            #[inline]
+            fn $mth(self, other: Self) -> Self::Output {
+                let ($a, $b) = (self.x, self.dx);
+                let ($c, $d) = (other.x, other.dx);
+                $body
+            }
+        }
         impl $trt<&DFloat<$t>> for DFloat<$t> {
             type Output = Self;
             #[inline]
@@ -366,16 +398,12 @@ macro_rules! impl_binop {
                 $body
             }
         }
-        impl<T> $trt<T> for &DFloat<$t>
-        where
-            T: Into<DFloat<$t>>
-        {
+        impl $trt<$t> for &DFloat<$t> {
             type Output = DFloat<$t>;
             #[inline]
-            fn $mth(self, other: T) -> Self::Output {
-                let other: DFloat<$t> = other.into();
+            fn $mth(self, other: $t) -> Self::Output {
                 let ($a, $b) = (self.x, self.dx);
-                let ($c, $d) = (other.x, other.dx);
+                let ($c, $d) = (other, 0 as $t);
                 $body
             }
         }
@@ -388,14 +416,27 @@ macro_rules! impl_binop {
                 $body
             }
         }
-        $(
-        impl<T> $asgn_trt<T> for DFloat<$t>
-        where
-            T: Into<Self>,
-        {
+        impl $trt<DFloat<$t>> for &DFloat<$t> {
+            type Output = DFloat<$t>;
             #[inline]
-            fn $asgn_mth(&mut self, other: T) {
-                let other: Self = other.into();
+            fn $mth(self, other: DFloat<$t>) -> Self::Output {
+                let ($a, $b) = (self.x, self.dx);
+                let ($c, $d) = (other.x, other.dx);
+                $body
+            }
+        }
+        $(
+        impl $asgn_trt<$t> for DFloat<$t> {
+            #[inline]
+            fn $asgn_mth(&mut self, other: $t) {
+                let ($a, $b) = (self.x, self.dx);
+                let ($c, $d) = (other, 0 as $t);
+                *self = $body
+            }
+        }
+        impl $asgn_trt<DFloat<$t>> for DFloat<$t> {
+            #[inline]
+            fn $asgn_mth(&mut self, other: Self) {
                 let ($a, $b) = (self.x, self.dx);
                 let ($c, $d) = (other.x, other.dx);
                 *self = $body
