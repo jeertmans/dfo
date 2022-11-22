@@ -25,5 +25,12 @@ libm = ["num-traits/libm"]
 std = ["num-traits/std", "serde/std"]
 
 [dev-dependencies]
+autodiff = "0.6"
 concat-idents = "1.1.4"
+criterion = "0.4"
 ndarray = "0.15.0"
+
+[[bench]]
+name    = "bench_main"
+path = "benches/bench_main.rs"
+harness = false

@@ -44,14 +44,14 @@
 //!     assert_eq!(f(x).deriv(), df(x).value());
 //! }
 //! ```
-//! 
+//!
 //! If you want to work with arrays, e.g., with `ndarray`, you can do so!
 //!
 //! ```
 //! use dfo::forward::primitive::*;
 //! use ndarray::{azip, Array1};
 //!
-//! let x: Array1<DFloat32> = 
+//! let x: Array1<DFloat32> =
 //!     Array1::from_iter([1., 2., 3., 4.].iter().map(|x| DFloat32::var(*x)));
 //!
 //! let y = &x * &x * 3.0;
@@ -60,7 +60,7 @@
 //! ```
 pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
-use num_traits::{Float, FloatConst, Num, NumCast, One, ToPrimitive, Zero};
+use num_traits::{Float, FloatConst, Num, NumCast, One, FromPrimitive, ToPrimitive, Zero};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::{
@@ -505,6 +505,23 @@ macro_rules! impl_num {
 
 #[cfg(feature = "num-traits")]
 impl_num!(f32 f64);
+
+#[cfg(feature = "num-traits")]
+macro_rules! impl_from_primitive {
+    ($($t:ty)*) => ($(
+        impl FromPrimitive for DFloat<$t> {
+            fn from_i64(n: i64) -> Option<Self> {
+                <$t>::from_i64(n).map(|x| x.into())
+            }
+            fn from_u64(n: u64) -> Option<Self> {
+                <$t>::from_u64(n).map(|x| x.into())
+            }
+        }
+    )*)
+}
+
+#[cfg(feature = "num-traits")]
+impl_from_primitive!(f32 f64);
 
 #[cfg(feature = "num-traits")]
 macro_rules! impl_to_primitive {
