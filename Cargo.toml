@@ -1,6 +1,6 @@
 [package]
 name = "dfo"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 authors = ["Jérome Eertmans <jeertmans@icloud.com>"]
 edition = "2021"
 description = "Differentiable Floating-point Operations in Rust."

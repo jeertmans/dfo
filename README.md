@@ -43,8 +43,9 @@ The generic module implements a given differentiation mode on generic types. For
 
 The following crate feature flags are available. They are configured in your `Cargo.toml`.
 
-* `num-traits`: supports for (most) traits defined in [`num-traits`](https://docs.rs/num-traits/latest/num_traits/)
-* `std`: Rust standard library-using functionality (enabled by default)
+* `libm`: enables `num-traits/libm` feature
+* `num-traits`: supports for (most) traits defined in [`num-traits`](https://docs.rs/num-traits/latest/num_traits/) (**enabled by default**)
+* `std`: Rust standard library-using functionality (**enabled by default**)
 * `serde`: serialization support for [`serde`](https://serde.rs/) 1.x
 
 ## Crate Goals
@@ -72,13 +73,7 @@ DFO has two main objectives. It has to be:
 
 Here is a small **TO-DO** list of things  that I would like to work on:
 
-- [ ] Improve docs
-- [ ] Benchmark against autodiffs
 - [ ] Create features for `primitive`, `forward` and `backward`
-- [ ] Add more needed impl. for Differentiable trait: to and from tuple
-- [ ] Create tests and benchmarks
-- [ ] Implement other traits, until `Float` is implemented
-- [ ] Reorganize and clean crate
 - [ ] Create examples for multiple inputs, multiple outputs, ndarrays, and more
 - [ ] Go for backward autodiff
 
