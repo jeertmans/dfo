@@ -25,6 +25,7 @@
 //! It is also possible to use generatic types to re-use already existing code.
 //!
 //! ```
+//! # #[cfg(feature = "feature")] {
 //! # use dfo::forward::primitive::*;
 //! use num_traits::Float;
 //!
@@ -43,6 +44,7 @@
 //!
 //!     assert_eq!(f(x).deriv(), df(x).value());
 //! }
+//! # }
 //! ```
 //!
 //! If you want to work with arrays, e.g., with `ndarray`, you can do so!
@@ -62,13 +64,17 @@ pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, FloatConst, FromPrimitive, Num, NumCast, One, ToPrimitive, Zero};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+#[cfg(feature = "serde")]
+use serde::ser::{Serialize, SerializeStruct, Serializer};
+#[cfg(feature = "serde")]
+use std::fmt;
+//use serde::{Deserialize, Serialize};
 use std::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 /// Automatically differentiated float.
 ///
 /// This structure only implements interesting methods for
@@ -78,6 +84,141 @@ use std::ops::{
 pub struct DFloat<T> {
     x: T,
     dx: T,
+}
+
+#[cfg(feature = "serde")]
+macro_rules! impl_serde {
+    ($($t:ty)*) => ($(
+        impl Serialize for DFloat<$t> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let mut state = serializer.serialize_struct("DFloat", 2)?;
+                state.serialize_field("x", &self.x)?;
+                state.serialize_field("dx", &self.dx)?;
+                state.end()
+            }
+        }
+
+        impl<'de> Deserialize<'de> for DFloat<$t> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                enum Field { Value, Deriv }
+
+                impl<'de> Deserialize<'de> for Field {
+                    fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+                    where
+                        D: Deserializer<'de>,
+                    {
+                        struct FieldVisitor;
+
+                        impl<'de> Visitor<'de> for FieldVisitor {
+                            type Value = Field;
+
+                            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                                formatter.write_str("`x` or `dx`")
+                            }
+
+                            fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                            where
+                                E: de::Error,
+                            {
+                                match value {
+                                    "x" => Ok(Field::Value),
+                                    "dx" => Ok(Field::Deriv),
+                                    _ => Err(de::Error::unknown_field(value, FIELDS)),
+                                }
+                            }
+                        }
+
+                        deserializer.deserialize_identifier(FieldVisitor)
+                    }
+                }
+
+                struct DFloatVisitor;
+
+                impl<'de> Visitor<'de> for DFloatVisitor {
+                    type Value = DFloat<$t>;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                        formatter.write_str("struct DFloat")
+                    }
+
+                    fn visit_seq<V>(self, mut seq: V) -> Result<DFloat<$t>, V::Error>
+                    where
+                        V: SeqAccess<'de>,
+                    {
+                        let x = seq.next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                        let dx = seq.next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                        Ok(DFloat { x, dx })
+                    }
+
+                    fn visit_map<V>(self, mut map: V) -> Result<DFloat<$t>, V::Error>
+                    where
+                        V: MapAccess<'de>,
+                    {
+                        let mut x = None;
+                        let mut dx = None;
+                        while let Some(key) = map.next_key()? {
+                            match key {
+                                Field::Value => {
+                                    if x.is_some() {
+                                        return Err(de::Error::duplicate_field("x"));
+                                    }
+                                    x = Some(map.next_value()?);
+                                }
+                                Field::Deriv => {
+                                    if dx.is_some() {
+                                        return Err(de::Error::duplicate_field("dx"));
+                                    }
+                                    dx = Some(map.next_value()?);
+                                }
+                            }
+                        }
+                        let x = x.ok_or_else(|| de::Error::missing_field("x"))?;
+                        let dx = dx.ok_or_else(|| de::Error::missing_field("dx"))?;
+                        Ok(DFloat { x, dx })
+                    }
+                }
+
+                const FIELDS: &'static [&'static str] = &["x", "dx"];
+                deserializer.deserialize_struct("struct DFloat", FIELDS, DFloatVisitor)
+            }
+        }
+    )*)
+}
+
+#[cfg(feature = "serde")]
+impl_serde!(f32 f64);
+
+#[cfg(all(test, feature = "serde"))]
+macro_rules! test_serde {
+    ($($t:ty)*) => ($(
+        concat_idents::concat_idents!(test_name = test_serde, _, $t {
+            #[test]
+            fn test_name() {
+                let d1: DFloat<$t> = DFloat { x: 3.14, dx: 7.0 };
+                let serialized = serde_json::to_string(&d1).unwrap();
+
+                println!("{:?}", serialized);
+
+                let deserialized: DFloat<$t> = serde_json::from_str(&serialized).unwrap();
+
+                assert_eq!(d1, deserialized);
+            }
+        });
+    )*)
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+    test_serde!(f32 f64);
 }
 
 macro_rules! impl_differentiable {
@@ -247,8 +388,7 @@ macro_rules! impl_one {
 #[cfg(feature = "num-traits")]
 impl_one!(f32 f64);
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 macro_rules! test_one {
     ($($t:ty)*) => ($(
         concat_idents::concat_idents!(test_name = test_one, _, $t {
@@ -267,8 +407,7 @@ macro_rules! test_one {
     )*)
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 mod one_tests {
     use super::*;
     test_one!(f32 f64);
@@ -293,8 +432,7 @@ macro_rules! impl_zero {
 #[cfg(feature = "num-traits")]
 impl_zero!(f32 f64);
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 macro_rules! test_zero {
     ($($t:ty)*) => ($(
         concat_idents::concat_idents!(test_name = test_zero, _, $t {
@@ -313,8 +451,7 @@ macro_rules! test_zero {
     )*)
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 mod zero_tests {
     use super::*;
     test_zero!(f32 f64);
@@ -944,8 +1081,7 @@ macro_rules! test_all_ops {
     )*)
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 macro_rules! test_all_float {
     ($($t:ty)*) => ($(
         test_value_and_deriv!(floor, $t, 4.0,
@@ -1111,15 +1247,13 @@ mod ops_tests {
     test_all_ops!(f32 f64);
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 mod test_float {
     use super::*;
     test_all_float!(f32 f64);
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 macro_rules! test_function {
     ($name:ident, $t:ty $(, $vars:literal)*, |$f_var:tt| $body_f:block, |$df_var:tt| $body_df:block) => (
         concat_idents::concat_idents!(test_name = test_function_, $name, _, $t, _has_expected_derivative {
@@ -1144,8 +1278,7 @@ macro_rules! test_function {
     )
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 macro_rules! test_all_functions {
     ($($t:ty)*) => ($(
             test_function!(poly2, $t, -10., 0., 5.,
@@ -1171,8 +1304,7 @@ macro_rules! test_all_functions {
     )*)
 }
 
-#[cfg(feature = "num-traits")]
-#[cfg(test)]
+#[cfg(all(test, feature = "num-traits"))]
 mod test_functions {
     use super::*;
     test_all_functions!(f32 f64);
