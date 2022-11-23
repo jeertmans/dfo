@@ -60,7 +60,7 @@
 //! ```
 pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
-use num_traits::{Float, FloatConst, Num, NumCast, One, FromPrimitive, ToPrimitive, Zero};
+use num_traits::{Float, FloatConst, FromPrimitive, Num, NumCast, One, ToPrimitive, Zero};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::{

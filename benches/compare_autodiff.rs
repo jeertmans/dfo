@@ -1,8 +1,7 @@
 use autodiff::{Float as ADFloat, F, FT};
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use dfo::forward::primitive::*;
-use ndarray::{Array1};
-
+use ndarray::Array1;
 
 fn autodiff_basic(x: f64) -> f64 {
     let x = F::var(x);
@@ -81,7 +80,7 @@ fn autodiff_array(n: usize) -> f64 {
 
     let x: Array1<F<f64, f64>> = ones.map(|o| *o * x);
 
-    let y: Array1<F<f64, f64>> = x.map(|x| *x * x.exp() + 3.0); 
+    let y: Array1<F<f64, f64>> = x.map(|x| *x * x.exp() + 3.0);
     y.mean().unwrap().deriv()
 }
 
@@ -92,10 +91,9 @@ fn dfo_array(n: usize) -> f64 {
 
     let x: Array1<DFloat64> = ones.map(|o| *o * x);
 
-    let y: Array1<DFloat64> = x.map(|x| *x * x.exp() + 3.0); 
+    let y: Array1<DFloat64> = x.map(|x| *x * x.exp() + 3.0);
     *(y.mean().unwrap().deriv())
 }
-
 
 fn autodiff_array_product(n: usize) -> f64 {
     let x: F<f64, f64> = F::var(3.14f64);
@@ -104,7 +102,7 @@ fn autodiff_array_product(n: usize) -> f64 {
 
     let x: Array1<F<f64, f64>> = ones.map(|o| *o * x);
 
-    let y: Array1<F<f64, f64>> = x.map(|x| x.cos()); 
+    let y: Array1<F<f64, f64>> = x.map(|x| x.cos());
     y.product().deriv()
 }
 
@@ -115,7 +113,7 @@ fn dfo_array_product(n: usize) -> f64 {
 
     let x: Array1<DFloat64> = ones.map(|o| *o * x);
 
-    let y: Array1<DFloat64> = x.map(|x| x.cos()); 
+    let y: Array1<DFloat64> = x.map(|x| x.cos());
     *(y.product().deriv())
 }
 
@@ -123,11 +121,11 @@ macro_rules! bench_group (
     ($name:ident, $adfun:ident, $dfofun:ident $(, $inputs:literal)*) => (
         concat_idents::concat_idents!(bench_name = bench_, $name, {
             fn bench_name(c: &mut Criterion) {
-                let mut group = c.benchmark_group(stringify!($name));
+                let mut group = c.benchmark_group(format!("compare_autodiff_{}", stringify!($name)));
                 for x in [$($inputs ,)*].iter() {
                     let left = $adfun(*x);
                     let right = $dfofun(*x);
-                    assert!((left - right).abs() <= 1e-6,  "autodiff and dfo derivatives are not close enough: {:?} (ad) and {:?} (dfo)", left, right);
+                    debug_assert!((left - right).abs() <= 1e-6,  "autodiff and dfo derivatives are not close enough: {:?} (ad) and {:?} (dfo)", left, right);
                     group.bench_with_input(BenchmarkId::new("autodiff", x), x,
                         |b, x| b.iter(|| $adfun(*x)));
                     group.bench_with_input(BenchmarkId::new("dfo", x), x,
@@ -151,7 +149,12 @@ bench_group!(mediums, autodiff_medium, dfo_medium, 3f64);
 
 bench_group!(arrays, autodiff_array, dfo_array, 10000);
 
-bench_group!(arrays_product, autodiff_array_product, dfo_array_product, 10000);
+bench_group!(
+    arrays_product,
+    autodiff_array_product,
+    dfo_array_product,
+    10000
+);
 
 criterion_group!(
     benches,
@@ -163,3 +166,5 @@ criterion_group!(
     bench_arrays,
     bench_arrays_product,
 );
+
+criterion_main!(benches);
