@@ -64,9 +64,9 @@ pub use super::traits::Differentiable;
 #[cfg(feature = "num-traits")]
 use num_traits::{Float, FloatConst, FromPrimitive, Num, NumCast, One, ToPrimitive, Zero};
 #[cfg(feature = "serde")]
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 #[cfg(feature = "serde")]
-use serde::de::{self, Deserialize, Deserializer, Visitor, SeqAccess, MapAccess};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 #[cfg(feature = "serde")]
 use std::fmt;
 //use serde::{Deserialize, Serialize};
@@ -107,21 +107,21 @@ macro_rules! impl_serde {
                 D: Deserializer<'de>,
             {
                 enum Field { Value, Deriv }
-        
+
                 impl<'de> Deserialize<'de> for Field {
                     fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
                     where
                         D: Deserializer<'de>,
                     {
                         struct FieldVisitor;
-        
+
                         impl<'de> Visitor<'de> for FieldVisitor {
                             type Value = Field;
-        
+
                             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                                 formatter.write_str("`x` or `dx`")
                             }
-        
+
                             fn visit_str<E>(self, value: &str) -> Result<Field, E>
                             where
                                 E: de::Error,
@@ -133,20 +133,20 @@ macro_rules! impl_serde {
                                 }
                             }
                         }
-        
+
                         deserializer.deserialize_identifier(FieldVisitor)
                     }
                 }
-        
+
                 struct DFloatVisitor;
-        
+
                 impl<'de> Visitor<'de> for DFloatVisitor {
                     type Value = DFloat<$t>;
-        
+
                     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                         formatter.write_str("struct DFloat")
                     }
-        
+
                     fn visit_seq<V>(self, mut seq: V) -> Result<DFloat<$t>, V::Error>
                     where
                         V: SeqAccess<'de>,
@@ -157,7 +157,7 @@ macro_rules! impl_serde {
                             .ok_or_else(|| de::Error::invalid_length(1, &self))?;
                         Ok(DFloat { x, dx })
                     }
-        
+
                     fn visit_map<V>(self, mut map: V) -> Result<DFloat<$t>, V::Error>
                     where
                         V: MapAccess<'de>,
@@ -185,7 +185,7 @@ macro_rules! impl_serde {
                         Ok(DFloat { x, dx })
                     }
                 }
-        
+
                 const FIELDS: &'static [&'static str] = &["x", "dx"];
                 deserializer.deserialize_struct("struct DFloat", FIELDS, DFloatVisitor)
             }
